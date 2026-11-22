@@ -31,7 +31,7 @@ import org.fcitx.fcitx5.android.utils.userManager
 import timber.log.Timber
 import kotlin.system.exitProcess
 
-class FcitxApplication : Application() {
+open class FcitxApplication : Application() {
 
     val coroutineScope = MainScope() + CoroutineName("FcitxApplication")
 

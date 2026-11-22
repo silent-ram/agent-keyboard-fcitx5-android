@@ -20,6 +20,7 @@ defaults:
 
 jobs:
   fdroid-build:
+    if: github.repository == 'fcitx5-android/fcitx5-android'
     runs-on: ubuntu-24.04
     container: registry.gitlab.com/fdroid/fdroidserver:buildserver-trixie
     strategy:

@@ -47,6 +47,7 @@ import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
@@ -74,6 +75,11 @@ import org.fcitx.fcitx5.android.utils.monitorCursorAnchor
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import org.fcitx.fcitx5.android.utils.styledFloat
 import org.fcitx.fcitx5.android.utils.withBatchEdit
+import com.agentkeyboard.ime.FcitxAgentPanelController
+import com.agentkeyboard.ime.EditorSessionTracker
+import com.agentkeyboard.ime.EditorTargetIdentity
+import com.agentkeyboard.ime.ImeContextProvider
+import com.agentkeyboard.ime.Mode as AgentInputMode
 import splitties.bitflags.hasFlag
 import splitties.dimensions.dp
 import splitties.resources.styledColor
@@ -121,6 +127,39 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private var capabilityFlags = CapabilityFlags.DefaultFlags
 
     private val selection = CursorTracker()
+    private val agentEditorSessionTracker = EditorSessionTracker()
+    private var agentPanelControllerRef: FcitxAgentPanelController? = null
+
+    internal val agentPanelController: FcitxAgentPanelController
+        get() = agentPanelControllerRef ?: FcitxAgentPanelController(this).also {
+            agentPanelControllerRef = it
+            it.onEditorChanged(currentAgentEditorGeneration, isAgentPanelBlocked())
+        }
+
+    internal val agentPanelControllerOrNull: FcitxAgentPanelController?
+        get() = agentPanelControllerRef
+
+    internal val currentAgentEditorGeneration: Long
+        get() = agentEditorSessionTracker.generation
+
+    internal fun isAgentPanelBlocked(): Boolean =
+        ImeContextProvider.detect(currentInputEditorInfo) == AgentInputMode.PASSWORD ||
+            capabilityFlags.has(CapabilityFlag.PasswordOrSensitive)
+
+    fun toggleAgentPanel() {
+        if (isAgentPanelBlocked()) return
+        val panel = agentPanelController
+        if (panel.isVisible) {
+            panel.close()
+            resetComposingState()
+            postFcitxJob { reset() }
+            return
+        }
+        finishComposing()
+        resetComposingState()
+        postFcitxJob { reset() }
+        panel.open()
+    }
 
     val currentInputSelection: CursorRange
         get() = selection.latest
@@ -249,6 +288,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         }
                     }
                 } else {
+                    if (agentPanelControllerOrNull?.isVisible == true) {
+                        val keyEvent = cachedKeyEvents.remove(it.timestamp)
+                        agentPanelControllerOrNull?.onHardwareKey(
+                            keyEvent?.keyCode ?: it.sym.keyCode,
+                            keyEvent?.unicodeChar ?: it.unicode,
+                            keyEvent?.action != KeyEvent.ACTION_UP && !it.up,
+                        )
+                        return@event
+                    }
                     // KeyEvent from physical keyboard (or input method engine forwardKey)
                     // use cached event if available
                     cachedKeyEvents.remove(it.timestamp)?.let { keyEvent ->
@@ -338,6 +386,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleDeleteSurrounding(before: Int, after: Int) {
+        if (agentPanelControllerOrNull?.inputRouter?.deleteSurrounding(before, after) {} == true) return
         val ic = currentInputConnection ?: return
         if (before > 0) {
             selection.predictOffset(-before)
@@ -350,6 +399,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleBackspaceKey() {
+        if (agentPanelControllerOrNull?.inputRouter?.backspace {} == true) return
         val lastSelection = selection.latest
         if (lastSelection.isNotEmpty()) {
             selection.predict(lastSelection.start)
@@ -381,6 +431,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleReturnKey() {
+        if (agentPanelControllerOrNull?.isVisible == true) {
+            agentPanelControllerOrNull?.insertLineBreak()
+            return
+        }
         currentInputEditorInfo.run {
             if (inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_NULL ||
                 imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_ENTER_ACTION)
@@ -401,6 +455,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleArrowKey(keyCode: Int) {
+        if (agentPanelControllerOrNull?.isVisible == true) return
         val type = currentInputEditorInfo.inputType and InputType.TYPE_MASK_CLASS
         val variation = currentInputEditorInfo.inputType and InputType.TYPE_MASK_VARIATION
         if (type == InputType.TYPE_NULL ||
@@ -421,6 +476,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun commitText(text: String, cursor: Int = -1) {
+        if (agentPanelControllerOrNull?.inputRouter?.commit(text) {} == true) {
+            resetComposingState()
+            return
+        }
         val ic = currentInputConnection ?: return
         // when composing text equals commit content, finish composing text as-is
         if (composing.isNotEmpty() && composingText.toString() == text) {
@@ -733,6 +792,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         resetComposingState()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         capabilityFlags = flags
+        val nextAgentEditor = EditorTargetIdentity(
+            packageName = attribute.packageName,
+            fieldId = attribute.fieldId,
+            inputType = attribute.inputType,
+            privateImeOptions = attribute.privateImeOptions,
+        )
+        val editorGeneration = agentEditorSessionTracker.onStartInput(nextAgentEditor, restarting)
+        agentPanelControllerOrNull?.onEditorChanged(editorGeneration, isAgentPanelBlocked())
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
@@ -785,6 +852,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         candidatesStart: Int,
         candidatesEnd: Int
     ) {
+        if (agentPanelControllerOrNull?.isVisible == true) {
+            selection.consume(newSelStart, newSelEnd)
+            return
+        }
         // onUpdateSelection can left behind when user types quickly enough, eg. long press backspace
         cursorUpdateIndex += 1
         Timber.d("onUpdateSelection: old=[$oldSelStart,$oldSelEnd] new=[$newSelStart,$newSelEnd] cand=[$candidatesStart,$candidatesEnd]")
@@ -920,6 +991,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // because of https://android.googlesource.com/platform/frameworks/base.git/+/refs/tags/android-11.0.0_r45/core/java/android/view/inputmethod/BaseInputConnection.java#851
     // it's not possible to set cursor inside composing text
     private fun updateComposingText(text: FormattedText) {
+        if (agentPanelControllerOrNull?.inputRouter?.preedit(text.toString()) {} == true) {
+            composingText = text
+            return
+        }
         val ic = currentInputConnection ?: return
         val lastSelection = selection.latest
         ic.beginBatchEdit()
@@ -976,6 +1051,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * Also updates internal composing state of [FcitxInputMethodService].
      */
     fun finishComposing() {
+        if (agentPanelControllerOrNull?.isVisible == true) {
+            agentPanelControllerOrNull?.onPreedit("")
+            resetComposingState()
+            return
+        }
         val ic = currentInputConnection ?: return
         if (composing.isEmpty()) return
         composing.clear()
@@ -1049,6 +1129,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
+        if (agentPanelControllerOrNull?.isVisible == true) {
+            agentPanelControllerOrNull?.close()
+            resetComposingState()
+            postFcitxJob { reset() }
+        }
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
         currentInputConnection?.apply {
@@ -1084,6 +1169,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onDestroy() {
+        agentPanelControllerOrNull?.closeRuntime()
         recreateInputViewPrefs.forEach {
             it.unregisterOnChangeListener(recreateInputViewListener)
         }

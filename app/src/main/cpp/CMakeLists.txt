@@ -61,6 +61,18 @@ target_link_libraries(native-lib
         pinyin-customphrase
         )
 
+set(AGENT_KEYBOARD_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../../../..")
+add_library(agentime SHARED "${AGENT_KEYBOARD_ROOT}/android/app/src/main/cpp/libime_jni.cpp")
+target_compile_features(agentime PRIVATE cxx_std_20)
+target_compile_options(agentime PRIVATE -fvisibility=hidden)
+target_link_libraries(agentime PRIVATE
+        android
+        log
+        LibIME::Pinyin
+        LibIME::Core
+        Fcitx5::Utils
+        )
+
 # copy module libraries from dependency lib
 add_custom_target(copy-fcitx5-modules
         COMMAND ${CMAKE_COMMAND} -E copy_if_different

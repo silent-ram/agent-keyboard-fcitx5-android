@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.data
 
 import android.media.AudioManager
 import android.os.Build
-import android.os.VibrationEffect
 import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import android.view.View
@@ -16,7 +15,6 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.audioManager
 import org.fcitx.fcitx5.android.utils.getSystemSettings
-import org.fcitx.fcitx5.android.utils.vibrator
 
 object InputFeedbacks {
 
@@ -43,16 +41,6 @@ object InputFeedbacks {
     private val soundOnKeyPressVolume by keyboardPrefs.soundOnKeyPressVolume
     private val hapticOnKeyPress by keyboardPrefs.hapticOnKeyPress
     private val hapticOnKeyUp by keyboardPrefs.hapticOnKeyUp
-    private val buttonPressVibrationMilliseconds by keyboardPrefs.buttonPressVibrationMilliseconds
-    private val buttonLongPressVibrationMilliseconds by keyboardPrefs.buttonLongPressVibrationMilliseconds
-    private val buttonPressVibrationAmplitude by keyboardPrefs.buttonPressVibrationAmplitude
-    private val buttonLongPressVibrationAmplitude by keyboardPrefs.buttonLongPressVibrationAmplitude
-
-    private val vibrator = appContext.vibrator
-
-    private val hasAmplitudeControl =
-        (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) && vibrator.hasAmplitudeControl()
-
     fun hapticFeedback(view: View, longPress: Boolean = false, keyUp: Boolean = false) {
         when (hapticOnKeyPress) {
             InputFeedbackMode.Enabled -> {}
@@ -60,48 +48,18 @@ object InputFeedbacks {
             InputFeedbackMode.FollowingSystem -> if (!systemHapticFeedback) return
         }
         if (keyUp && !hapticOnKeyUp) return
-        val duration: Long
-        val amplitude: Int
-        val hfc: Int
-        if (longPress) {
-            duration = buttonLongPressVibrationMilliseconds.toLong()
-            amplitude = buttonLongPressVibrationAmplitude
-            hfc = HapticFeedbackConstants.LONG_PRESS
-        } else {
-            duration = buttonPressVibrationMilliseconds.toLong()
-            amplitude = buttonPressVibrationAmplitude
-            hfc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && keyUp) {
+        val hfc = when {
+            longPress -> HapticFeedbackConstants.LONG_PRESS
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && keyUp ->
                 HapticFeedbackConstants.KEYBOARD_RELEASE
-            } else {
-                HapticFeedbackConstants.KEYBOARD_TAP
-            }
+            else -> HapticFeedbackConstants.KEYBOARD_TAP
         }
-
-        // there is `VibrationEffect.DEFAULT_AMPLITUDE` but no default duration;
-        // also `VibrationEffect.createOneShot()` only accepts positive duration.
-        // so changing amplitude without changing duration makes no sense
-        if (duration != 0L) {
-            // on Android 13, if system haptic feedback was disabled, `vibrator.vibrate()` won't work
-            // but `view.performHapticFeedback()` with `FLAG_IGNORE_GLOBAL_SETTING` still works
-            if (hasAmplitudeControl && amplitude != 0) {
-                vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val ve = VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE)
-                vibrator.vibrate(ve)
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(duration)
-            }
-        } else {
-            var flags = HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
-            if (hapticOnKeyPress == InputFeedbackMode.Enabled) {
-                // it says "Starting TIRAMISU only privileged apps can ignore user settings for touch feedback"
-                // but we still seem to be able to use `FLAG_IGNORE_GLOBAL_SETTING`
-                @Suppress("DEPRECATION")
-                flags = flags or HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-            }
-            view.performHapticFeedback(hfc, flags)
+        var flags = HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+        if (hapticOnKeyPress == InputFeedbackMode.Enabled) {
+            @Suppress("DEPRECATION")
+            flags = flags or HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
         }
+        view.performHapticFeedback(hfc, flags)
     }
 
     enum class SoundEffect {

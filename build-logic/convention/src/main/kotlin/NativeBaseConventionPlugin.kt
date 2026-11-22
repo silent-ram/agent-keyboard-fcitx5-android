@@ -13,7 +13,8 @@ import org.gradle.kotlin.dsl.register
 open class NativeBaseConventionPlugin : Plugin<Project> {
 
     override fun apply(target: Project) {
-        val prebuiltDir = target.rootProject.projectDir.resolve("lib/fcitx5/src/main/cpp/prebuilt")
+        val fcitxRoot = target.rootProject.project(":lib:fcitx5").projectDir.parentFile.parentFile
+        val prebuiltDir = fcitxRoot.resolve("lib/fcitx5/src/main/cpp/prebuilt")
         val isBuildingBundle = target.rootProject.gradle.startParameter.taskNames.any {
             it.startsWith("${target.path}:bundle")
         }

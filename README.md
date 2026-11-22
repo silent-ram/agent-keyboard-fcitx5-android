@@ -1,8 +1,10 @@
-# fcitx5-android
+# Agent Keyboard Android keyboard base
 
-[Fcitx5](https://github.com/fcitx/fcitx5) input method framework and engines ported to Android.
+`silent-ram` maintains this keyboard base for [Agent Keyboard](https://github.com/silent-ram/agent-keyboard). It is based on [Fcitx5 for Android](https://github.com/fcitx5-android/fcitx5-android). The original copyright notices and [license](LICENSE) apply to the inherited code.
 
-## Download
+See the [Agent Keyboard repository](https://github.com/silent-ram/agent-keyboard) for product builds and instructions.
+
+## Upstream releases
 
 [<img src="https://github.com/rubenpgrady/get-it-on-github/raw/refs/heads/main/get-it-on-github.png" alt="Git it on GitHub" width="207" height="80">](https://github.com/fcitx5-android/fcitx5-android/releases/latest)
 [<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" width="207" height="80">](https://f-droid.org/packages/org.fcitx.fcitx5.android)
@@ -28,7 +30,7 @@ You can also download the **latest CI build** on our Jeninks server: [![build st
 
 In case you want Fcitx5 on other platforms: [macOS](https://github.com/fcitx-contrib/fcitx5-macos), [iOS](https://github.com/fcitx-contrib/fcitx5-ios), [HarmonyOS](https://github.com/fcitx-contrib/fcitx5-harmony), [ChromeOS](https://github.com/fcitx-contrib/fcitx5-chrome), [Windows](https://github.com/fcitx-contrib/fcitx5-windows); or [try Fcitx5 in the browser](https://fcitx-contrib.github.io/online/index.html)
 
-## Project status
+## Upstream capabilities
 
 ### Supported Languages
 
@@ -61,7 +63,7 @@ In case you want Fcitx5 on other platforms: [macOS](https://github.com/fcitx-con
 - Customizable keyboard layout
 - More input methods (via plugin)
 
-## Screenshots
+## Upstream screenshots
 
 |拼音, Material Light theme, key border enabled|自然码双拼, Pixel Dark theme, key border disabled|
 |:-:|:-:|
@@ -73,11 +75,7 @@ In case you want Fcitx5 on other platforms: [macOS](https://github.com/fcitx-con
 
 ## Get involved
 
-Trello kanban: https://trello.com/b/gftk6ZdV/kanban
-
-Matrix Room: https://matrix.to/#/#fcitx5-android:mozilla.org
-
-Discuss on Telegram: [@fcitx5_android_group](https://t.me/fcitx5_android_group) ([@fcitx5_android](https://t.me/fcitx5_android) originally)
+Report product issues in [silent-ram/agent-keyboard](https://github.com/silent-ram/agent-keyboard/issues).
 
 ## Build
 

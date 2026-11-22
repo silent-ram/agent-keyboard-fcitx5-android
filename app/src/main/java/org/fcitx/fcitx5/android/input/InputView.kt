@@ -13,6 +13,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InlineSuggestionsResponse
+import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
@@ -60,6 +61,7 @@ import splitties.views.dsl.constraintlayout.startOfParent
 import splitties.views.dsl.constraintlayout.startToEndOf
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
+import splitties.views.dsl.core.frameLayout
 import splitties.views.dsl.core.imageView
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.view
@@ -110,6 +112,8 @@ class InputView(
     private val symbolPicker = symbolPicker()
     private val emojiPicker = emojiPicker()
     private val emoticonPicker = emoticonPicker()
+
+    private lateinit var assistantPanelSlot: FrameLayout
 
     private fun setupScope() {
         scope += this@InputView.wrapToUniqueComponent()
@@ -224,6 +228,14 @@ class InputView(
 
         customBackground.imageDrawable = theme.backgroundDrawable(keyBorder)
 
+        assistantPanelSlot = frameLayout {
+            visibility = GONE
+            add(
+                service.agentPanelController.createView(this@InputView.context),
+                FrameLayout.LayoutParams(matchParent, matchParent),
+            )
+        }
+
         keyboardView = constraintLayout {
             // allow MotionEvent to be delivered to keyboard while pressing on padding views.
             // although it should be default for apps targeting Honeycomb (3.0, API 11) and higher,
@@ -247,8 +259,12 @@ class InputView(
                 endOfParent()
                 bottomOfParent()
             })
-            add(windowManager.view, lParams {
+            add(assistantPanelSlot, lParams(matchParent, dp(320)) {
                 below(kawaiiBar.view)
+                centerHorizontally()
+            })
+            add(windowManager.view, lParams {
+                below(assistantPanelSlot)
                 above(bottomPaddingSpace)
                 /**
                  * set start and end constrain in [updateKeyboardSize]
@@ -262,6 +278,12 @@ class InputView(
         }
 
         updateKeyboardSize()
+        service.agentPanelController.setVisibilityListener { visible ->
+            assistantPanelSlot.visibility = if (visible) VISIBLE else GONE
+            assistantPanelSlot.requestLayout()
+            keyboardView.requestLayout()
+            requestLayout()
+        }
 
         add(preedit.ui.root, lParams(matchParent, wrapContent) {
             above(keyboardView)
@@ -316,6 +338,7 @@ class InputView(
         }
         preedit.ui.root.setPadding(sidePadding, 0, sidePadding, 0)
         kawaiiBar.view.setPadding(sidePadding, 0, sidePadding, 0)
+        assistantPanelSlot.setPadding(sidePadding, 0, sidePadding, 0)
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
@@ -331,7 +354,14 @@ class InputView(
     fun startInput(info: EditorInfo, capFlags: CapabilityFlags, restarting: Boolean = false) {
         broadcaster.onStartInput(info, capFlags)
         returnKeyDrawable.updateDrawableOnEditorInfo(info)
-        if (focusChangeResetKeyboard || !restarting) {
+        // AGENT-FIX(2026-11-20): always guarantee KeyboardWindow is the attached window when the
+        // input view (re)starts. With focusChangeResetKeyboard disabled + a restarting input, a
+        // previously replaced/collapsed window could never recover, leaving the keyboard area
+        // permanently blank until the IME service was restarted (observed on emulator after
+        // assistant panel open/close sequences). attachWindow is a no-op-safe re-attach when the
+        // KeyboardWindow is already current.
+        if (focusChangeResetKeyboard || !restarting || !windowManager.isAttached(keyboardWindow)) {
+            Timber.d("startInput: attach KeyboardWindow (reset=$focusChangeResetKeyboard, restarting=$restarting, attached=${windowManager.isAttached(keyboardWindow)})")
             windowManager.attachWindow(KeyboardWindow)
         }
     }

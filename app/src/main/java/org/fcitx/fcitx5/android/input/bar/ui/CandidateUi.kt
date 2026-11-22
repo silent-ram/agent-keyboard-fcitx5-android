@@ -8,6 +8,7 @@ import android.content.Context
 import android.view.View
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import splitties.views.dsl.constraintlayout.after
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.before
 import splitties.views.dsl.constraintlayout.centerVertically
@@ -24,15 +25,22 @@ class CandidateUi(override val ctx: Context, theme: Theme, private val horizonta
         id = R.id.expand_candidate_btn
         visibility = View.INVISIBLE
     }
+    val assistantButton = ToolButton(ctx, R.drawable.ic_baseline_auto_awesome_24, theme).apply {
+        contentDescription = ctx.getString(R.string.agent_keyboard_assistant_panel)
+    }
 
     override val root = ctx.constraintLayout {
         add(expandButton, lParams(dp(40)) {
             centerVertically()
             endOfParent()
         })
-        add(horizontalView, lParams {
+        add(assistantButton, lParams(dp(40)) {
             centerVertically()
             startOfParent()
+        })
+        add(horizontalView, lParams {
+            centerVertically()
+            after(assistantButton)
             before(expandButton)
         })
     }

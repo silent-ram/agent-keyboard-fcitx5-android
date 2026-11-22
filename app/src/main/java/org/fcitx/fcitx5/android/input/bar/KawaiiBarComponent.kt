@@ -290,6 +290,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 swipeThresholdX = swipeThresholdY
                 onGestureListener = swipeHideKeyboardCallback
             }
+            assistantButton.setOnClickListener { service.toggleAgentPanel() }
             buttonsUi.apply {
                 undoButton.setOnClickListener {
                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
@@ -335,6 +336,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private val candidateUi by lazy {
         CandidateUi(context, theme, horizontalCandidate.view).apply {
+            assistantButton.setOnClickListener { service.toggleAgentPanel() }
             expandButton.apply {
                 swipeEnabled = true
                 swipeThresholdY = dp(HEIGHT.toFloat())
@@ -436,6 +438,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             idleUi.privateMode(info.imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
         }
         isCapabilityFlagsPassword = toolbarNumRowOnPassword && capFlags.has(CapabilityFlag.Password)
+        val assistantAllowed = !capFlags.has(CapabilityFlag.PasswordOrSensitive)
+        idleUi.assistantButton.visibility = if (assistantAllowed) View.VISIBLE else View.INVISIBLE
+        candidateUi.assistantButton.visibility = if (assistantAllowed) View.VISIBLE else View.INVISIBLE
         isInlineSuggestionPresent = false
         numberRowState = NumberRowState.Auto
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

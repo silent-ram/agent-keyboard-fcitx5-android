@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.ui.main
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import androidx.appcompat.app.AlertDialog
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
@@ -21,8 +22,21 @@ class AboutFragment : PaddingPreferenceFragment() {
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         preferenceScreen = preferenceManager.createPreferenceScreen(requireContext()).apply {
+            addPreference(R.string.app_name, Const.maintainer) {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Const.githubRepo)))
+            }
             addPreference(R.string.privacy_policy) {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Const.privacyPolicyUrl)))
+                val text = try {
+                    Const.readPrivacyNotice(requireContext().assets)
+                } catch (_: java.io.IOException) {
+                    null
+                }
+                if (text == null) {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Const.privacyPolicyUrl)))
+                } else {
+                    AlertDialog.Builder(requireContext()).setTitle(R.string.privacy_policy)
+                        .setMessage(text).setPositiveButton(android.R.string.ok, null).show()
+                }
             }
             addPreference(
                 R.string.open_source_licenses,

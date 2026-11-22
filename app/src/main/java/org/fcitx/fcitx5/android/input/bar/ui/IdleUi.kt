@@ -75,6 +75,10 @@ class IdleUi(
         iconRotation = menuButtonRotation
     }
 
+    val assistantButton = ToolButton(ctx, R.drawable.ic_baseline_auto_awesome_24, theme).apply {
+        contentDescription = ctx.getString(R.string.agent_keyboard_assistant_panel)
+    }
+
     val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24, theme)
 
     val emptyBar = Space(ctx)
@@ -123,9 +127,13 @@ class IdleUi(
             endOfParent()
             centerVertically()
         })
+        add(assistantButton, lParams(size, size) {
+            before(hideKeyboardButton)
+            centerVertically()
+        })
         add(animator, lParams(matchConstraints, matchParent) {
             after(menuButton)
-            before(hideKeyboardButton)
+            before(assistantButton)
             centerVertically()
         })
     }
